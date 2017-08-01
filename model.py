@@ -46,7 +46,7 @@ def deconv_layer(input,stride,size,output_shape,input_shape,activation=tf.nn.elu
 
 class GAN:
 	def __init__(self,sess,latent_dim,gen_shapes,dis_shapes,
-				gen_filters,dis_filters,out_height=28,out_width=28,out_dim=1):
+				gen_filters,dis_filters,samples_dir='samples/',out_height=28,out_width=28,out_dim=1):
 		if len(gen_filters)+2!=len(gen_shapes) or len(dis_filters)+2!=len(dis_shapes):
 			print ('incompatible filter and shape inputs')
 			return
@@ -59,8 +59,7 @@ class GAN:
 		self.output_ht = out_height
 		self.output_wd = out_width
 		self.out_dim = out_dim
-		if self.latent_dim == None:
-			print 'hello'
+		self.samples_dir = samples_dir
 	
 	def build_generator(self,Z,phase,weights=[]):
 		batch_size = tf.shape(Z)[0]
@@ -268,7 +267,7 @@ class GAN:
 	
 			print('epoch %i || dcost = %f | gcost = %f' % (epoch,sum(d_list)/float(len(d_list)), sum(g_list)/float(len(g_list))))
 			if epoch%1 == 0:
-				self.save_samples(self.generated,name=('samples/epoch_%i.png'%(epoch)))
+				self.save_samples(self.generated,name=(self.samples_dir+('epoch_%i.png'%(epoch))))
 			if stabilize:
 				print('\t#stabilize_d %i || #stabilize_g %i' % (stable_d, stable_g))
 	
