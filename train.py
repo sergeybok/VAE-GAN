@@ -35,13 +35,14 @@ gen_layers = [[None,latent_dim],
 			[None,7,7,64],
 			[None,14,14,16],
 			[None,28,28,1]]
-gen_filters = [4,5,5,5]
+gen_filters = [4,5,5,7]
 
 dis_layers = [[None,28,28,1],
-			[None,7,7,16],
-			[None,4,4,32],
+			[None,7,7,4],
+			[None,4,4,8],
+			[None,2,2,16],
 			[None,1]]
-dis_filters = [7,5]
+dis_filters = [7,3,2]
 
 
 sess = tf.InteractiveSession()
@@ -50,7 +51,8 @@ gan = GAN(sess=sess,
 		gen_shapes=gen_layers,
 		dis_shapes=dis_layers,
 		gen_filters=gen_filters,
-		dis_filters=dis_filters)
+		dis_filters=dis_filters,
+		samples_dir='samples2/')
 
 
 gan.build_gan()
@@ -58,12 +60,14 @@ gan.build_gan()
 
 print('begin training..')
 
-gan.train_gan(n_epochs=20,
+gan.train_gan(n_epochs=30,
 			dataset=dataset,
 			batch_size=batch_size,
 			lr=learning_rate,
 			keep_prob=0.7,
 			stabilize=True)
+
+
 
 
 

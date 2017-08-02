@@ -3,7 +3,8 @@ import numpy as np
 
 
 
-
+def lrelu(x, alpha=0.1):
+  return tf.nn.relu(x) - alpha * tf.nn.relu(-x)
 
 
 def dense_layer(input,input_shape,output_shape,activation,weight=None,bias=None,name='dense_layer'):
@@ -64,7 +65,7 @@ class GAN:
 	def build_generator(self,Z,phase,weights=[]):
 		batch_size = tf.shape(Z)[0]
 		cur_shape = self.gen_shapes[0]
-		activation = tf.nn.elu
+		activation = lrelu
 		next_shape = self.gen_shapes[1]
 
 		cur_layer, cur_weight = dense_layer(Z,cur_shape,next_shape,
@@ -112,7 +113,7 @@ class GAN:
 							training=phase)
 			weights += cur_weight
 
-		return tf.abs(cur_layer), weights
+		return (cur_layer), weights
 			
 
 	def build_double_discriminator(self,X,keep,weights=[]):
