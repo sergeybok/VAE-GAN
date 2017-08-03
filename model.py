@@ -47,10 +47,8 @@ def deconv_layer(input,stride,size,output_shape,input_shape,activation=tf.nn.elu
 
 class GAN:
 	def __init__(self,sess,latent_dim,gen_shapes,dis_shapes,
-				gen_filters,dis_filters,samples_dir='samples/',out_height=28,out_width=28,out_dim=1):
-		if len(gen_filters)+2!=len(gen_shapes) or len(dis_filters)+2!=len(dis_shapes):
-			print ('incompatible filter and shape inputs')
-			return
+				gen_filters=None,dis_filters=None,samples_dir='samples/',out_height=28,out_width=28,out_dim=1):
+		
 		self.sess = sess
 		self.latent_dim = latent_dim
 		self.gen_shapes=gen_shapes
@@ -62,10 +60,52 @@ class GAN:
 		self.out_dim = out_dim
 		self.samples_dir = samples_dir
 	
+
+	def build_fc_generator(self,Z,weights=[],activation=tf.nn.elu):
+		batch_size = tf.shape(Z)[0]
+		if len(weights) == 0:
+			weights += [None]*((len(self.gen_shapes)-1)*2)
+		cur_layer = tf.reshape(Z,[batch_size,self.gen_shapes[0][-1]])
+		for i in range(1,len(self.gen_shapes)):
+			cur_shape = self.gen_shapes[i-1]
+			next_shape = self.gen_shapes[i]
+			if i+1 == len(self.gen_shapes):
+				activation = tf.nn.sigmoid #tf.nn.tanh
+			cur_layer, cur_weight = dense_layer(cur_layer,cur_shape,next_shape,
+									activation=activation,weight=weights[(i-1)*2],
+									bias=weights[(i-1)*2+1],name=('gen_layer_%i'%i))
+			weights[(i-1)*2] = cur_weight[0]
+			weights[(i-1)*2+1] = cur_weight[1]
+
+		return tf.reshape(cur_layer,[batch_size,28,28,1]), weights
+
+	def build_fc_discriminator(self,X,keep,weights=[],activation=tf.nn.relu):
+		batch_size = tf.shape(X)[0]
+		if len(weights) == 0:
+			weights += [None]*((len(self.dis_shapes)-1)*2)
+		cur_layer = tf.reshape(X,[batch_size,self.dis_shapes[0][-1]])
+		for i in range(1,len(self.dis_shapes)):
+			cur_shape = self.dis_shapes[i-1]
+			next_shape = self.dis_shapes[i]
+			if i+1 == len(self.dis_shapes):
+				activation = tf.nn.sigmoid
+				cur_layer = tf.nn.dropout(cur_layer,keep)
+			cur_layer, cur_weight = dense_layer(cur_layer,cur_shape,next_shape,
+									activation=activation,weight=weights[(i-1)*2],
+									bias=weights[(i-1)*2+1],name=('dis_layer_%i'%i))
+			weights[(i-1)*2] = cur_weight[0]
+			weights[(i-1)*2+1] = cur_weight[1]
+		return cur_layer, weights
+
+
+
 	def build_generator(self,Z,phase,weights=[]):
 		batch_size = tf.shape(Z)[0]
+		if len(weights) == 0:
+			weights += [None]*((len(self.gen_shapes)-1)*2)
+
 		cur_shape = self.gen_shapes[0]
-		activation = lrelu
+		activation = tf.nn.elu
 		next_shape = self.gen_shapes[1]
 
 		cur_layer, cur_weight = dense_layer(Z,cur_shape,next_shape,
@@ -76,7 +116,7 @@ class GAN:
 
 		for i in range(2,len(self.gen_shapes)):
 			if i+1 == len(self.gen_shapes):
-				activation = tf.nn.tanh
+				activation = tf.nn.sigmoid
 			cur_shape = self.gen_shapes[i-1]
 			next_shape = self.gen_shapes[i]
 			cur_shape[0] = batch_size
@@ -107,11 +147,14 @@ class GAN:
 							output_shape=next_shape,
 							input_shape=cur_shape,
 							activation=activation,
+							weight=weights[(i-1)*2],
+							bias=weights[(i-1)*2+1],
 							name=('deconv_layer_%i'%i))
 			cur_layer = tf.layers.batch_normalization(tf.reshape(cur_layer,
 							[batch_size,next_shape[1],next_shape[2],next_shape[3]]),
 							training=phase)
-			weights += cur_weight
+			weights[(i-1)*2] = cur_weight[0]
+			weights[(i-1)*2+1] = cur_weight[1]
 
 		return (cur_layer), weights
 			
@@ -123,7 +166,7 @@ class GAN:
 		activation = tf.nn.relu
 		next_shape = cur_shape
 		if len(weights) == 0:
-			weights = [None]*((len(self.dis_shapes)-1)*2)
+			weights += [None]*((len(self.dis_shapes)-1)*2)
 		for i in range(1,len(self.dis_shapes)):
 			next_shape = self.dis_shapes[i]
 			cur_shape = self.dis_shapes[i-1]
@@ -199,17 +242,24 @@ class GAN:
 		return x_out,x_hat_out, weights
 
 		
-	def build_gan(self,optimizer=tf.train.AdamOptimizer):
+	def build_gan(self,optimizer=tf.train.AdamOptimizer,conv=True):
 		self.X = tf.placeholder(tf.float32, shape=[None,28,28,1], name='Xdata')
 		self.Z = tf.placeholder(tf.float32, shape=[None,self.latent_dim], name='Zprior')
 		self.LR = tf.placeholder(tf.float32)
 		self.keep_prob = tf.placeholder(tf.float32)
 		self.phase = tf.placeholder(tf.bool, name='phase')
+		if conv:
+			if len(gen_filters)+2!=len(gen_shapes) or len(dis_filters)+2!=len(dis_shapes):
+				print ('incompatible filter and shape inputs')
+				return
+			self.generated, self.gen_params = self.build_generator(self.Z,self.phase)
+			self.data_prediction, self.gen_prediction, self.d_params = self.build_discriminator(self.X,self.generated,keep=self.keep_prob,phase=self.phase)
+		else:
+			self.generated, self.gen_params = self.build_fc_generator(self.Z)
+			self.data_prediction, self.d_params = self.build_fc_discriminator(self.X,keep=self.keep_prob)
+			self.gen_prediction, self.d_params = self.build_fc_discriminator(self.generated,keep=self.keep_prob,weights=self.d_params)
+			
 
-		self.generated, self.gen_params = self.build_generator(self.Z,self.phase)
-		self.data_prediction, self.gen_prediction, self.d_params = self.build_discriminator(self.X,self.generated,keep=self.keep_prob,phase=self.phase)
-		#self.gen_prediction, _ = self.build_discriminator(self.generated,keep=self.keep_prob,weights=self.d_params)
-		
 		offset = 1e-7
 		d_prediction = tf.clip_by_value(self.data_prediction, offset, 1 - offset)
 		g_prediction = tf.clip_by_value(self.gen_prediction, offset, 1 - offset)
@@ -225,10 +275,10 @@ class GAN:
 		self.train_step_g = self.optimizer.minimize(self.cost_g,var_list=self.gen_params)
 		
 		#check model
-		if len(self.d_params)/2 != len(self.dis_shapes)-1:
+		if conv and len(self.d_params)/2 != len(self.dis_shapes)-1:
 			print ('dparam problem, len of dparam %i len of dis_shapes %i'
 					%(len(self.d_params),len(self.dis_shapes)))
-		if len(self.gen_params)/2 != len(self.gen_shapes)-1:
+		if conv and  len(self.gen_params)/2 != len(self.gen_shapes)-1:
 			print ('gen param problem, len of gen param %i len of gen_shapes %i'
 					%(len(self.gen_params),len(self.gen_shapes)))
 		
