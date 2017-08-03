@@ -21,14 +21,13 @@ print('loading mnist..')
 dataset, _, _ = load_mnist()
 dataset, _ = dataset
 dataset = dataset.reshape(dataset.shape[0],28,28)
-dataset = dataset[:dataset.shape[0]/2]
+#dataset = dataset[:dataset.shape[0]/2]
 
 
-#dataset = dataset[:len(dataset)/2]
 
 print('building model..')
 
-
+"""
 gen_layers = [[None,latent_dim],
 			[None,1,1,latent_expansion],
 			[None,4,4,256],
@@ -44,6 +43,23 @@ dis_layers = [[None,28,28,1],
 			[None,1]]
 dis_filters = [7,3,2]
 
+"""
+gen_layers = [[None,latent_dim],
+				[None,latent_expansion],
+				[None,2048],
+				[None,1024],
+				[None,900],
+				[None,784]]
+gen_filters = None
+
+dis_layers = [[None,784],
+				[None,1024],
+				[None,512],
+				[None,256],
+				[None,1]]
+
+dis_filters = None
+
 
 sess = tf.InteractiveSession()
 gan = GAN(sess=sess,
@@ -55,7 +71,7 @@ gan = GAN(sess=sess,
 		samples_dir='samples2/')
 
 
-gan.build_gan()
+gan.build_gan(conv=False)
 
 
 print('begin training..')
