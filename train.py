@@ -7,11 +7,11 @@ from model import *
 
 
 
-latent_dim = 30
+latent_dim = 100
 latent_expansion = 1024
 learning_rate = 2e-4
 
-n_epochs = 20
+n_epochs = 30
 batch_size = 100
 
 
@@ -47,15 +47,11 @@ dis_filters = [7,3,2]
 gen_layers = [[None,latent_dim],
 				[None,latent_expansion],
 				[None,2048],
-				[None,1024],
-				[None,900],
 				[None,784]]
 gen_filters = None
 
 dis_layers = [[None,784],
-				[None,1024],
-				[None,512],
-				[None,256],
+				[None,128],
 				[None,1]]
 
 dis_filters = None
@@ -68,19 +64,20 @@ gan = GAN(sess=sess,
 		dis_shapes=dis_layers,
 		gen_filters=gen_filters,
 		dis_filters=dis_filters,
-		samples_dir='samples2/')
+		samples_dir='samples3/',
+		conv=False)
 
 
-gan.build_gan(conv=False)
+gan.build_gan()
 
 
 print('begin training..')
 
-gan.train_gan(n_epochs=30,
+gan.train_gan(n_epochs=n_epochs,
 			dataset=dataset,
 			batch_size=batch_size,
 			lr=learning_rate,
-			keep_prob=0.7,
+			keep_prob=0.5,
 			stabilize=True)
 
 

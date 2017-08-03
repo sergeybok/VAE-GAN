@@ -47,7 +47,8 @@ def deconv_layer(input,stride,size,output_shape,input_shape,activation=tf.nn.elu
 
 class GAN:
 	def __init__(self,sess,latent_dim,gen_shapes,dis_shapes,
-				gen_filters=None,dis_filters=None,samples_dir='samples/',out_height=28,out_width=28,out_dim=1):
+				gen_filters=None,dis_filters=None,samples_dir='samples/',
+				out_height=28,out_width=28,out_dim=1,conv=True):
 		
 		self.sess = sess
 		self.latent_dim = latent_dim
@@ -59,6 +60,7 @@ class GAN:
 		self.output_wd = out_width
 		self.out_dim = out_dim
 		self.samples_dir = samples_dir
+		self.conv = conv
 	
 
 	def build_fc_generator(self,Z,weights=[],activation=tf.nn.elu):
@@ -242,13 +244,13 @@ class GAN:
 		return x_out,x_hat_out, weights
 
 		
-	def build_gan(self,optimizer=tf.train.AdamOptimizer,conv=True):
+	def build_gan(self,optimizer=tf.train.AdamOptimizer):
 		self.X = tf.placeholder(tf.float32, shape=[None,28,28,1], name='Xdata')
 		self.Z = tf.placeholder(tf.float32, shape=[None,self.latent_dim], name='Zprior')
 		self.LR = tf.placeholder(tf.float32)
 		self.keep_prob = tf.placeholder(tf.float32)
 		self.phase = tf.placeholder(tf.bool, name='phase')
-		if conv:
+		if self.conv:
 			if len(gen_filters)+2!=len(gen_shapes) or len(dis_filters)+2!=len(dis_shapes):
 				print ('incompatible filter and shape inputs')
 				return
@@ -275,10 +277,10 @@ class GAN:
 		self.train_step_g = self.optimizer.minimize(self.cost_g,var_list=self.gen_params)
 		
 		#check model
-		if conv and len(self.d_params)/2 != len(self.dis_shapes)-1:
+		if self.conv and len(self.d_params)/2 != len(self.dis_shapes)-1:
 			print ('dparam problem, len of dparam %i len of dis_shapes %i'
 					%(len(self.d_params),len(self.dis_shapes)))
-		if conv and  len(self.gen_params)/2 != len(self.gen_shapes)-1:
+		if self.conv and  len(self.gen_params)/2 != len(self.gen_shapes)-1:
 			print ('gen param problem, len of gen param %i len of gen_shapes %i'
 					%(len(self.gen_params),len(self.gen_shapes)))
 		
@@ -308,7 +310,7 @@ class GAN:
 					dcost = self.sess.run([self.cost_d],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.phase:True})
 					stable_d +=1
 				
-				if not stabilize or ((sum(d_list[-stabilize_batch:])/stabilize_batch) < 1.4):
+				if not stabilize or ((sum(d_list[-stabilize_batch:])/stabilize_batch) < 1.5):
 					_, gcost = self.sess.run([self.train_step_g,self.cost_g],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.LR:lr,self.phase:True})
 				else:
 					_, gcost = self.sess.run([self.train_step_g,self.cost_g],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.LR:(lr/2.0),self.phase:True})
