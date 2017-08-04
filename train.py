@@ -11,7 +11,7 @@ latent_dim = 100
 latent_expansion = 1024
 learning_rate = 2e-4
 
-n_epochs = 30
+n_epochs = 300
 batch_size = 100
 
 
@@ -27,7 +27,7 @@ dataset = dataset.reshape(dataset.shape[0],28,28)
 
 print('building model..')
 
-"""
+
 gen_layers = [[None,latent_dim],
 			[None,1,1,latent_expansion],
 			[None,4,4,256],
@@ -37,11 +37,11 @@ gen_layers = [[None,latent_dim],
 gen_filters = [4,5,5,7]
 
 dis_layers = [[None,28,28,1],
-			[None,7,7,4],
-			[None,4,4,8],
+			[None,14,14,32],
+			[None,7,7,64],
 			[None,2,2,16],
 			[None,1]]
-dis_filters = [7,3,2]
+dis_filters = [5,5,2]
 
 """
 gen_layers = [[None,latent_dim],
@@ -51,13 +51,15 @@ gen_layers = [[None,latent_dim],
 gen_filters = None
 
 dis_layers = [[None,784],
-				[None,128],
+				[None,100],
 				[None,1]]
 
 dis_filters = None
+"""
 
 
 sess = tf.InteractiveSession()
+"""
 gan = GAN(sess=sess,
 		latent_dim=latent_dim,
 		gen_shapes=gen_layers,
@@ -67,6 +69,11 @@ gan = GAN(sess=sess,
 		samples_dir='samples3/',
 		conv=False)
 
+"""
+
+gan = simpleGAN(sess=sess,
+				latent_dim=latent_dim,
+				samples_dir='samples_simple/')
 
 gan.build_gan()
 
@@ -77,7 +84,7 @@ gan.train_gan(n_epochs=n_epochs,
 			dataset=dataset,
 			batch_size=batch_size,
 			lr=learning_rate,
-			keep_prob=0.5,
+			keep_prob=1.,
 			stabilize=True)
 
 
