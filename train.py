@@ -11,7 +11,7 @@ latent_dim = 100
 latent_expansion = 1024
 learning_rate = 2e-4
 
-n_epochs = 300
+n_epochs = 100
 batch_size = 100
 
 

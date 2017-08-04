@@ -463,18 +463,18 @@ class simpleGAN:
 		self.phase = tf.placeholder(tf.bool)
 
 		#gen
-		layer_1, layer_1_params = dense_layer(self.Z,[None,self.latent_dim],[None,1024],activation=tf.nn.elu)
-		self.generated, layer_2_params = dense_layer(layer_1,[None,1024],[None,784],activation=tf.nn.sigmoid)
+		layer_1, layer_1_params = dense_layer(self.Z,[None,self.latent_dim],[None,2048],activation=tf.nn.elu)
+		self.generated, layer_2_params = dense_layer(layer_1,[None,2048],[None,784],activation=tf.nn.sigmoid)
 		self.gen_params = layer_1_params + layer_2_params
 
 
 		#dis
 		d_in = tf.contrib.layers.flatten(self.X)
-		dlayer1, dlayer1_params = dense_layer(d_in,[None,784],[None,64],activation=tf.nn.tanh)
-		self.data_prediction, dlayer2_params = dense_layer(dlayer1,[None,32],[None,1],activation=tf.nn.sigmoid)
+		dlayer1, dlayer1_params = dense_layer(d_in,[None,784],[None,512],activation=tf.nn.elu)
+		self.data_prediction, dlayer2_params = dense_layer(dlayer1,[None,512],[None,1],activation=tf.nn.sigmoid)
 
-		dlayer1_, _ = dense_layer(self.generated,[None,784],[None,64],activation=tf.nn.tanh,weight=dlayer1_params[0],bias=dlayer1_params[1])
-		self.gen_prediction, _ = dense_layer(dlayer1_,[None,64],[None,1],activation=tf.nn.sigmoid,weight=dlayer2_params[0],bias=dlayer2_params[1])
+		dlayer1_, _ = dense_layer(self.generated,[None,784],[None,512],activation=tf.nn.elu,weight=dlayer1_params[0],bias=dlayer1_params[1])
+		self.gen_prediction, _ = dense_layer(dlayer1_,[None,512],[None,1],activation=tf.nn.sigmoid,weight=dlayer2_params[0],bias=dlayer2_params[1])
 		self.d_params = dlayer1_params + dlayer2_params
 
 
