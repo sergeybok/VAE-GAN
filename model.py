@@ -105,18 +105,29 @@ class GAN:
 		batch_size = tf.shape(Z)[0]
 		if len(weights) == 0:
 			weights += [None]*((len(self.gen_shapes)-1)*2)
-
+		count = 0
 		cur_shape = self.gen_shapes[0]
 		activation = tf.nn.elu
 		next_shape = self.gen_shapes[1]
+		cur_layer = Z
+		i = 0
 
-		cur_layer, cur_weight = dense_layer(Z,cur_shape,next_shape,
-			activation=tf.nn.elu,name='gen_layer_1')
-		weights += cur_weight
+		while len(self.gen_shapes[i]) < 4:
+			cur_shape = self.gen_shapes[i-1]
+			next_shape = self.gen_shapes[i]
+			cur_shape[0] = batch_size
+			next_shape[0] = batch_size
+			cur_layer, cur_weight = dense_layer(cur_layer,cur_shape,next_shape,
+								activation=activation,name=('gen_layer_%i'%i))
+			weights[(i-1)*2] = cur_weight[0]
+			weights[(i-1)*2+1] = cur_weight[1]
+			i+=1
+		cur_shape = self.gen_shapes[i-1]
+		next_shape = self.gen_shapes[i]
+		cur_shape[0] = batch_size
 		next_shape[0] = batch_size
 		cur_layer = tf.reshape(cur_layer,next_shape)
-
-		for i in range(2,len(self.gen_shapes)):
+		while i < len(self.gen_shapes):
 			if i+1 == len(self.gen_shapes):
 				activation = tf.nn.sigmoid
 			cur_shape = self.gen_shapes[i-1]
@@ -157,22 +168,25 @@ class GAN:
 							training=phase)
 			weights[(i-1)*2] = cur_weight[0]
 			weights[(i-1)*2+1] = cur_weight[1]
+			i+=1
 
 		return (cur_layer), weights
 			
 
-	def build_double_discriminator(self,X,keep,weights=[]):
+	def build_discriminator(self,X,keep,weights=[]):
 		batch_size = tf.shape(X)[0]
 		cur_shape = self.dis_shapes[0]
 		cur_layer = X 
-		activation = tf.nn.relu
+		activation = tf.nn.elu
 		next_shape = cur_shape
+		count = 0
 		if len(weights) == 0:
 			weights += [None]*((len(self.dis_shapes)-1)*2)
 		for i in range(1,len(self.dis_shapes)):
 			next_shape = self.dis_shapes[i]
 			cur_shape = self.dis_shapes[i-1]
 			if len(next_shape) < 4:
+				count = i
 				break
 			stride_ht = cur_shape[1] // next_shape[1]
 			stride_wd = cur_shape[2] // next_shape[2]
@@ -192,15 +206,21 @@ class GAN:
 							name=('dis_layer_%i'%i))
 			weights[(i-1)*2] = cur_weight[0]
 			weights[(i-1)*2+1] = cur_weight[1]
-		cur_layer = tf.nn.dropout(tf.contrib.layers.flatten(cur_layer),keep)
-		cur_layer,cur_weight = dense_layer(cur_layer,cur_shape,next_shape,
-						activation=tf.nn.sigmoid,weight=weights[-2],
-						bias=weights[-1],name='dis_layer_final')
-		weights[-2] = cur_weight[0]
-		weights[-1] = cur_weight[1]
+		cur_layer = tf.contrib.layers.flatten(cur_layer)
+		for i in range(count,len(self.dis_shapes)):
+			if i+1 == len(self.dis_shapes):
+				activation = tf.nn.sigmoid
+				cur_layer = tf.nn.dropout(cur_layer,keep)
+			next_shape = self.dis_shapes[i]
+			cur_shape = self.dis_shapes[i-1]
+			cur_layer,cur_weight = dense_layer(cur_layer,cur_shape,next_shape,
+						activation=activation,weight=weights[(i-1)*2],
+						bias=weights[(i-1)*2+1],name='dis_layer_final')
+			weights[(i-1)*2] = cur_weight[0]
+			weights[(i-1)*2+1] = cur_weight[1]
 		return cur_layer, weights
 
-	def build_discriminator(self,X,X_hat,keep,phase,weights=[]):
+	def build_d_discriminator(self,X,X_hat,keep,phase,weights=[]):
 		cur_shape = self.dis_shapes[0]
 		cur_layer = tf.concat([X,X_hat],0)
 		batch_size = tf.shape(cur_layer)[0]
@@ -427,7 +447,116 @@ class GAN:
 
 
 
+class simpleGAN:
+	def __init__(self,sess,latent_dim,samples_dir):
+		self.latent_dim = latent_dim
+		self.sess =sess
+		self.samples_dir = samples_dir
+		self.output_ht = 28
+		self.output_wd = 28
 
+	def build_gan(self,optimizer=tf.train.AdamOptimizer):
+		self.X = tf.placeholder(tf.float32, shape=[None,28,28,1], name='Xdata')
+		self.Z = tf.placeholder(tf.float32, shape=[None,self.latent_dim], name='Zprior')
+		self.LR = tf.placeholder(tf.float32)
+		self.keep_prob = tf.placeholder(tf.float32)
+		self.phase = tf.placeholder(tf.bool)
+
+		#gen
+		layer_1, layer_1_params = dense_layer(self.Z,[None,self.latent_dim],[None,1024],activation=tf.nn.elu)
+		self.generated, layer_2_params = dense_layer(layer_1,[None,1024],[None,784],activation=tf.nn.sigmoid)
+		self.gen_params = layer_1_params + layer_2_params
+
+
+		#dis
+		d_in = tf.contrib.layers.flatten(self.X)
+		dlayer1, dlayer1_params = dense_layer(d_in,[None,784],[None,64],activation=tf.nn.tanh)
+		self.data_prediction, dlayer2_params = dense_layer(dlayer1,[None,32],[None,1],activation=tf.nn.sigmoid)
+
+		dlayer1_, _ = dense_layer(self.generated,[None,784],[None,64],activation=tf.nn.tanh,weight=dlayer1_params[0],bias=dlayer1_params[1])
+		self.gen_prediction, _ = dense_layer(dlayer1_,[None,64],[None,1],activation=tf.nn.sigmoid,weight=dlayer2_params[0],bias=dlayer2_params[1])
+		self.d_params = dlayer1_params + dlayer2_params
+
+
+
+		offset = 1e-7
+		d_prediction = tf.clip_by_value(self.data_prediction, offset, 1 - offset)
+		g_prediction = tf.clip_by_value(self.gen_prediction, offset, 1 - offset)
+
+		self.cost_d = -(tf.log(d_prediction) + tf.log(1 - g_prediction))
+		self.cost_g = -(tf.log(g_prediction))
+		
+		self.global_step = tf.Variable(0,trainable=False)
+
+		self.optimizer = optimizer(self.LR)
+		
+		self.train_step_d = self.optimizer.minimize(self.cost_d,var_list=self.d_params)
+		self.train_step_g = self.optimizer.minimize(self.cost_g,var_list=self.gen_params)
+		
+		init = tf.global_variables_initializer()
+		self.sess.run(init)
+
+	def train_gan(self,n_epochs,dataset,batch_size,lr,start_epoch=0,
+					keep_prob=1.,stabilize=False,stabilize_batch=20):
+
+		n_batches = len(dataset) // batch_size
+		for epoch in range(start_epoch,n_epochs):
+			d_list = [0.7]*stabilize_batch
+			g_list = []
+			stable_d =0
+			stable_g =0
+			np.random.shuffle(dataset)
+			for batch in range(n_batches):
+				tx = dataset[batch*batch_size:(batch+1)*(batch_size)]
+				tz = np.random.normal(0,1,(batch_size,self.latent_dim)).astype('float32')
+				if not stabilize or ((sum(d_list[-stabilize_batch:])/stabilize_batch) > 0.2):
+					_, dcost = self.sess.run([self.train_step_d, self.cost_d],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.LR:lr,self.phase:True})
+					prev_dcost = dcost.mean()
+				else:
+					dcost = self.sess.run([self.cost_d],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.phase:True})
+					stable_d +=1
+				
+				if not stabilize or ((sum(d_list[-stabilize_batch:])/stabilize_batch) < 1.5):
+					_, gcost = self.sess.run([self.train_step_g,self.cost_g],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.LR:lr,self.phase:True})
+				else:
+					_, gcost = self.sess.run([self.train_step_g,self.cost_g],feed_dict={self.X:np.expand_dims(tx,3),self.Z:tz,self.keep_prob:keep_prob,self.LR:(lr/2.0),self.phase:True})
+					stable_g +=1
+				d_list.append(np.mean(dcost))
+				g_list.append(np.mean(gcost))
+	
+			print('epoch %i || dcost = %f | gcost = %f' % (epoch,sum(d_list)/float(len(d_list)), sum(g_list)/float(len(g_list))))
+			if epoch%1 == 0:
+				self.save_samples(self.generated,name=(self.samples_dir+('epoch_%i.png'%(epoch))))
+			if stabilize:
+				print('\t#stabilize_d %i || #stabilize_g %i' % (stable_d, stable_g))
+
+
+
+
+
+	def save_samples(self,output,name='gan_demo.png'):
+ 		from scipy.misc import imsave
+ 		dim = 1
+		nx = 10
+		ny = 10
+		rng=3
+
+
+
+		xvals = np.linspace(-rng,rng,nx)
+		yvals = np.linspace(-rng,rng,ny)
+
+		img = np.empty((self.output_ht*ny,self.output_wd*nx))
+
+		for xi, xv in enumerate(xvals):
+			for yi, yv in enumerate(yvals):
+				if self.latent_dim == 2:
+					z = np.array([[xv,yv]],dtype='float32')
+				else: 
+					z = np.random.normal(0,1,(1,self.latent_dim))
+				x_giv_z = self.generated.eval(feed_dict={self.Z:z,self.keep_prob:0.7,self.phase:0})*255
+				img[(nx-xi-1)*self.output_ht:(nx-xi)*self.output_ht,yi*self.output_wd:(yi+1)*self.output_wd] = x_giv_z[0].reshape(self.output_ht,self.output_wd)
+		imsave(name,img)
 
 
 
