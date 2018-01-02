@@ -7,7 +7,8 @@ from model import *
 
 
 
-latent_dim = 100
+#latent_dim = 50
+
 latent_expansion = 1024
 learning_rate = 2e-4
 
@@ -18,58 +19,21 @@ batch_size = 100
 
 print('loading mnist..')
 
-dataset, _, _ = load_mnist()
-dataset, _ = dataset
-dataset = dataset.reshape(dataset.shape[0],28,28)
-#dataset = dataset[:dataset.shape[0]/2]
+#dataset, _, _ = load_mnist()
+#dataset, _ = dataset
+#dataset = dataset.reshape(dataset.shape[0],28,28)
+
+dataset= load_tf_mnist()
 
 
 
 print('building model..')
 
 
-gen_layers = [[None,latent_dim],
-			[None,1,1,latent_expansion],
-			[None,4,4,256],
-			[None,7,7,64],
-			[None,14,14,16],
-			[None,28,28,1]]
-gen_filters = [4,5,5,7]
-
-dis_layers = [[None,28,28,1],
-			[None,14,14,32],
-			[None,7,7,64],
-			[None,2,2,16],
-			[None,1]]
-dis_filters = [5,5,2]
-
-"""
-gen_layers = [[None,latent_dim],
-				[None,latent_expansion],
-				[None,2048],
-				[None,784]]
-gen_filters = None
-
-dis_layers = [[None,784],
-				[None,100],
-				[None,1]]
-
-dis_filters = None
-"""
 
 
 sess = tf.InteractiveSession()
-"""
-gan = GAN(sess=sess,
-		latent_dim=latent_dim,
-		gen_shapes=gen_layers,
-		dis_shapes=dis_layers,
-		gen_filters=gen_filters,
-		dis_filters=dis_filters,
-		samples_dir='samples3/',
-		conv=False)
 
-"""
 
 gan = simpleGAN(sess=sess,
 				latent_dim=latent_dim,
@@ -77,10 +41,14 @@ gan = simpleGAN(sess=sess,
 
 gan.build_gan()
 
+print('building vae')
+gan.build_vae()
+
+gan.init_variables()
 
 print('begin training..')
 
-gan.train_gan(n_epochs=n_epochs,
+gan.train_gan(n_epochs=10,
 			dataset=dataset,
 			batch_size=batch_size,
 			lr=learning_rate,
@@ -88,10 +56,26 @@ gan.train_gan(n_epochs=n_epochs,
 			stabilize=True)
 
 
+gan.train_vae(n_epochs=10,
+			dataset=dataset,
+			batch_size=batch_size,
+			lr=learning_rate,
+			train_gen=True)
+
+gan.train_gan(n_epochs=20,
+			dataset=dataset,
+			batch_size=batch_size,
+			lr=learning_rate,
+			keep_prob=1.,
+			stabilize=True,
+			start_epoch=10)
 
 
-
-
+gan.train_vae(n_epochs=20,
+			dataset=dataset,
+			batch_size=batch_size,
+			lr=learning_rate,
+			train_gen=True)
 
 
 
