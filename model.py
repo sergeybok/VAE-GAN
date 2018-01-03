@@ -1,5 +1,6 @@
 import tensorflow as tf 
 import numpy as np
+import os 
 
 
 
@@ -50,6 +51,8 @@ class simpleGAN:
 		self.latent_dim = latent_dim
 		self.sess = sess
 		self.samples_dir = samples_dir
+		if not os.path.isdir(samples_dir):
+			os.makedirs(samples_dir)
 		self.output_ht = 28
 		self.output_wd = 28
 		self.gen_params = []
