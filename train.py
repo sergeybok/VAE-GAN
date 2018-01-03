@@ -7,7 +7,7 @@ from model import *
 
 
 
-#latent_dim = 50
+latent_dim = 100
 
 latent_expansion = 1024
 learning_rate = 2e-4
@@ -37,7 +37,7 @@ sess = tf.InteractiveSession()
 
 gan = simpleGAN(sess=sess,
 				latent_dim=latent_dim,
-				samples_dir='samples_simple/')
+				samples_dir='latent100/gan20vae20/')
 
 gan.build_gan()
 
@@ -48,7 +48,9 @@ gan.init_variables()
 
 print('begin training..')
 
-gan.train_gan(n_epochs=10,
+
+
+gan.train_gan(n_epochs=20,
 			dataset=dataset,
 			batch_size=batch_size,
 			lr=learning_rate,
@@ -56,12 +58,15 @@ gan.train_gan(n_epochs=10,
 			stabilize=True)
 
 
-gan.train_vae(n_epochs=10,
+
+gan.train_vae(n_epochs=20,
 			dataset=dataset,
 			batch_size=batch_size,
 			lr=learning_rate,
 			train_gen=True)
 
+
+"""
 gan.train_gan(n_epochs=20,
 			dataset=dataset,
 			batch_size=batch_size,
@@ -77,5 +82,5 @@ gan.train_vae(n_epochs=20,
 			lr=learning_rate,
 			train_gen=True)
 
-
+"""
 
