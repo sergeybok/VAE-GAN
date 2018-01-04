@@ -136,7 +136,7 @@ class simpleGAN:
 							feed_dict={self.X:tx.reshape((-1,28,28,1)),self.Z:tz,self.keep_prob:keep_prob,self.phase:True})
 					stable_d +=1
 				
-				if not stabilize or ((sum(d_list[-stabilize_batch:])/stabilize_batch) < 1.2):
+				if not stabilize or ((sum(d_list[-stabilize_batch:])/stabilize_batch) < 1.5):
 					_, gcost = self.sess.run([self.train_step_g,self.cost_g],
 							feed_dict={self.X:tx.reshape((-1,28,28,1)),self.Z:tz,self.keep_prob:keep_prob,self.LR:lr,self.phase:True})
 				else:
